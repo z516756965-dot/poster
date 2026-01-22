@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>海报工坊 Pro - 最终精修版</title>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    
+    <style>
+        /* 字体挂载 */
+        @font-face {
+            font-family: 'JiangChengRound';
+            src: url('江城圆体 600W.ttf'); 
+        }
+        @font-face {
+            font-family: 'JiangChengRound500';
+            src: url('江城圆体 500W.ttf'); 
+        }
+
+        :root {
+            --ui-bg: #f4f6f9;
+            --ui-panel-bg: #ffffff;
+            --ui-accent: #2196F3;
+            --ui-text: #333;
+            --ui-border: #e1e4e8;
+            
+            --poster-w: 1080px;
+            --main-color: #4CAF50;
+            --stroke-color: #3e8e41; /* 初始值调亮 */
+            --tag-gradient: linear-gradient(135deg, #4CAF50, #81C784); 
+            --subtitle-gradient: linear-gradient(135deg, #3e8e41, #4CAF50);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0; background-color: var(--ui-bg);
+            display: flex; height: 100vh; overflow: hidden; color: var(--ui-text);
+            user-select: none; 
+        }
+
+        /* --- 左侧控制台 --- */
+        .control-panel {
+            width: 420px; background: var(--ui-panel-bg); 
+            padding: 25px; box-sizing: border-box;
+            border-right: 1px solid var(--ui-border);
+            display: flex; flex-direction: column; gap: 20px;
+            flex-shrink: 0; z-index: 100;
+            box-shadow: 5px 0 25px rgba(0,0,0,0.03);
+            position: relative;
+            overflow-y: auto;
+        }
+
+        h2 { margin: 0; font-size: 22px; font-weight: 800; color: #1a1a1a; display: flex; align-items: center; gap: 10px; }
+        .label-title { font-size: 13px; font-weight: 700; color: #666; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; letter-spacing: 0.5px;}
+
+        /* UI 组件 */
+        .ui-btn-group { display: flex; gap: 8px; background: #f0f2f5; padding: 5px; border-radius: 10px; }
+        .ui-btn {
+            flex: 1; border: none; background: transparent; padding: 10px; border-radius: 8px;
+            cursor: pointer; font-size: 13px; font-weight: 600; color: #666; transition: all 0.2s;
+        }
+        .ui-btn:hover { color: var(--ui-accent); background: rgba(33, 150, 243, 0.1); }
+        .ui-btn.active { background: #fff; color: var(--ui-accent); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+        .ui-slider { width: 100%; accent-color: var(--ui-accent); cursor: pointer; }
+        .ui-input { width: 100%; padding: 12px; border: 1px solid var(--ui-border); border-radius: 8px; font-size: 14px; box-sizing: border-box; outline: none; background: #f9fafb; transition: 0.2s;}
+        .ui-input:focus { border-color: var(--ui-accent); background: #fff; }
+
+        .color-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+        .color-dot { 
+            aspect-ratio: 1; border-radius: 10px; cursor: pointer; border: 3px solid transparent; 
+            transition: transform 0.2s; position: relative;
+        }
+        .color-dot.active { border-color: #333; transform: scale(0.9); }
+
+        /* 左侧底部下载按钮 */
+        .download-btn {
+            margin-top: auto; 
+            background: var(--ui-accent); 
+            color: white; 
+            border: none; padding: 16px;
+            border-radius: 12px; 
+            font-size: 16px; font-weight: bold; 
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3); 
+            transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .download-btn:hover { background: #1976D2; transform: translateY(-2px); }
+        .download-btn:active { transform: translateY(0); }
+
+        /* --- 右侧画布 --- */
+        .preview-area {
+            flex: 1; background: #eef2f6; overflow: hidden; position: relative;
+            display: flex; justify-content: center; align-items: flex-start;
+            padding: 60px;
+            background-image: radial-gradient(#d0d4d9 1px, transparent 1px);
+            background-size: 24px 24px;
+            cursor: default;
+        }
+
+        #zoom-wrapper {
+            transform-origin: top center; transition: transform 0.2s ease-out;
+            box-shadow: 0 30px 100px rgba(0,0,0,0.15);
+        }
+
+        /* 海报容器 */
+        #poster {
+            width: var(--poster-w); height: auto;
+            background-color: var(--main-color);
+            position: relative; display: flex; flex-direction: column;
+            overflow: hidden; 
+        }
+
+        /* Logo 悬浮样式 */
+        .poster-logo {
+            position: absolute; top: 0; left: 0;
+            width: 300px; height: auto;
+            z-index: 999; pointer-events: none; 
+        }
+
+        /* 1. 顶部头图 */
+        .poster-header {
+            width: 100%; height: 700px; 
+            background-color: #e0e0e0; 
+            position: relative; flex-shrink: 0;
+            background-size: cover; 
+            background-position: top center;
+            background-repeat: no-repeat;
+            overflow: visible; 
+        }
+
+        .poster-header::after {
+            content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 300px;
+            background: linear-gradient(to bottom, transparent, var(--main-color));
+            pointer-events: none; z-index: 1;
+        }
+
+        /* 头图主副标题容器 */
+        .header-text-container {
+            position: absolute;
+            left: 50%; top: 200px;
+            /* 🟢 锁定水平居中：仅 translateY 变化，translateX 固定 */
+            transform: translateX(-50%); 
+            display: flex; flex-direction: column; align-items: center; gap: 15px; 
+            z-index: 20; 
+            cursor: ns-resize; /* 🟢 鼠标样式改为上下箭头 */
+            user-select: none;
+            border: 2px dashed transparent; 
+            padding: 20px;
+            border-radius: 20px;
+            transition: border-color 0.2s;
+            width: 900px; /* 限制宽度，辅助文字换行 */
+            text-align: center;
+        }
+        .header-text-container.selected {
+            border-color: rgba(255,255,255,0.8);
+            background: rgba(0,0,0,0.1);
+        }
+
+        /* 副标题 (缩小至 85%) */
+        .header-subtitle {
+            background: var(--subtitle-gradient);
+            color: #fff;
+            font-family: 'JiangChengRound500', sans-serif;
+            /* 🟢 字号缩小：48 -> 40px */
+            font-size: 40px; 
+            /* 🟢 内边距缩小：15px 50px -> 12px 42px */
+            padding: 12px 42px;
+            border-radius: 60px;
+            letter-spacing: 3px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            cursor: text;
+        }
+
+        /* 主标题 */
+        .header-main-title {
+            font-family: 'JiangChengRound', sans-serif;
+            font-size: 110px;
+            color: #fff;
+            line-height: 1.2;
+            letter-spacing: 4px;
+            cursor: text;
+            position: relative;
+            
+            /* 🟢 描边加粗：18px -> 25px */
+            -webkit-text-stroke: 25px var(--stroke-color);
+            paint-order: stroke fill;
+            
+            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.2)) 
+                    drop-shadow(0 0 1px rgba(255,255,255,0.8))
+                    drop-shadow(0 0 1px rgba(255,255,255,0.8));
+            
+            /* 辅助换行：虽然contenteditable不能强制，但width限制会起作用 */
+            max-width: 100%; 
+            word-break: break-word;
+        }
+
+        /* 2. 内容卡片 */
+        .content-card {
+            background: #fff;
+            margin: -140px 50px 40px 50px;
+            border-radius: 40px;
+            padding: 0px 50px;
+            position: relative; z-index: 10;
+            box-shadow: 0 40px 120px rgba(0,0,0,0.1);
+            display: flex; flex-direction: column;
+        }
+
+        /* 标题 */
+        .title-container { text-align: center; margin-bottom: 40px; }
+        .main-title {
+            background: var(--main-color); color: #fff; display: inline-block;
+            padding: 25px 80px; border-radius: 120px;
+            font-family: 'JiangChengRound', "YouYuan", sans-serif;
+            background: var(--tag-gradient);
+            font-size: 64px; letter-spacing: 4px;
+            border-radius: 0 0 40px 40px;
+            
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+
+        /* 福利列表 */
+        .benefit-list { display: flex; flex-direction: column; gap: 50px; }
+
+        /* 福利行 */
+        .benefit-row {
+            background-color: #f8f9fb; border-radius: 30px;
+            min-height: 240px; 
+            padding: 50px 30px 40px 30px; 
+            display: flex; align-items: flex-start; 
+            position: relative; border: 4px solid transparent; 
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .benefit-row.selected { background: #fff; border-color: var(--main-color); box-shadow: 0 20px 60px rgba(0,0,0,0.06); }
+
+        .benefit-tag {
+            position: absolute; top: 0; left: 0; 
+            background: var(--tag-gradient); color: white;
+            font-family: 'JiangChengRound', "YouYuan", sans-serif;
+            font-size: 40px;
+            padding: 12px 45px; border-radius: 28px 0 28px 0;
+            z-index: 2;
+        }
+
+        .benefit-text { 
+            flex: 1; margin-right: 40px; 
+            padding-top: 60px; 
+            display: flex; flex-direction: column; justify-content: center;
+        }
+        .b-title { font-size: 48px; font-weight: 800; margin-bottom: 15px; color: #222; font-family: 'JiangChengRound', sans-serif;}
+        .b-desc { font-size: 30px; color: #666; line-height: 1.6; word-break: break-all;}
+
+        /* 图片上传区 - 容器 */
+        .benefit-upload-zone {
+            width: 240px; height: 200px;
+            border: 4px dashed #d0d7de; border-radius: 24px;
+            background: #fafafa;
+            position: relative; flex-shrink: 0; 
+            margin-top: 20px; 
+            display: flex; align-items: center; justify-content: center;
+            transition: 0.2s; overflow: visible; 
+        }
+        .benefit-upload-zone:hover { border-color: var(--ui-accent); background: #f0f7ff; }
+        
+        .benefit-upload-zone.has-image { 
+            border: none; 
+            background: transparent; 
+        }
+        .benefit-upload-zone.has-image:hover { background: transparent; }
+        .benefit-upload-zone.has-image .zone-placeholder { display: none; }
+        .zone-placeholder { font-size: 60px; color: #cbd0d6; pointer-events: none; }
+
+        /* 图片本身 */
+        .benefit-img {
+            width: 100%; height: auto; display: none;
+            cursor: grab; 
+            position: absolute; z-index: 5;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1));
+        }
+        .benefit-img:active { cursor: grabbing; } 
+        .benefit-img.selected { outline: 3px solid var(--ui-accent); }
+
+        /* 删除按钮 */
+        .delete-btn {
+            position: absolute; top: -15px; right: -15px;
+            width: 32px; height: 32px;
+            background: #ff4444; color: white;
+            border-radius: 50%;
+            text-align: center; line-height: 30px;
+            font-size: 24px; font-weight: bold;
+            cursor: pointer; z-index: 100;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            display: none; 
+            transition: transform 0.2s;
+        }
+        .delete-btn:hover { transform: scale(1.1); background: #ff0000; }
+        .benefit-upload-zone.has-image.selected .delete-btn { display: block; }
+
+
+        /* 底部说明 */
+        .poster-footer {
+            text-align: center; font-size: 32px; color: rgba(255,255,255,0.95);
+            margin-top: 10px; padding-bottom: 60px;
+            font-weight: 300; 
+            opacity: 0.8;    
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="control-panel">
+        <h2>🎨 海报工坊 Pro</h2>
+
+        <div class="panel-section">
+            <div class="label-title">视图缩放 <span id="zoom-text" style="color:var(--ui-accent)">40%</span></div>
+            <input type="range" class="ui-slider" id="zoom-slider" min="10" max="100" value="40" oninput="setZoom(this.value)">
+        </div>
+
+        <hr style="border-top:1px solid #eee; margin:0;">
+
+        <div class="panel-section">
+            <div class="label-title">1. 顶部背景</div>
+            <div style="background:#f9fafb; padding:15px; border-radius:12px; text-align:center; cursor:pointer; border:2px dashed #ddd;" 
+                 onclick="document.getElementById('header-upload').click()" id="header-drop-area">
+                <span style="font-size:20px;">🖼️</span> 点击 / 拖拽 / 粘贴
+                <input type="file" id="header-upload" hidden accept="image/*" onchange="handleHeaderFile(this.files[0])">
+            </div>
+            <div style="margin-top:10px; font-size:12px; display:flex; justify-content:space-between; color:#666;">
+                <span>高度</span><span id="header-h-text">700px</span>
+            </div>
+            <input type="range" class="ui-slider" min="400" max="1500" value="700" oninput="setHeaderHeight(this.value)">
+        </div>
+
+        <div class="panel-section">
+            <div class="label-title">2. 全局主题</div>
+            <div class="color-grid">
+                <div class="color-dot active" style="background:#4CAF50" onclick="updateTheme('#4CAF50', this)"></div>
+                <div class="color-dot" style="background:#2196F3" onclick="updateTheme('#2196F3', this)"></div>
+                <div class="color-dot" style="background:#FF9800" onclick="updateTheme('#FF9800', this)"></div>
+                <div class="color-dot" style="background:#fc2323" onclick="updateTheme('#fc2323', this)"></div>
+                <div class="color-dot" style="background:conic-gradient(red, yellow, lime, blue, magenta, red); overflow:hidden;">
+                    <input type="color" oninput="updateTheme(this.value, this.parentElement)" style="opacity:0; width:100%; height:100%; cursor:pointer;">
+                </div>
+            </div>
+            
+            <div class="label-title" style="margin-top:15px;">文字改色 <span style="font-size:11px; color:#999; font-weight:normal;">(选中文字后点击)</span></div>
+            <div class="ui-btn-group">
+                <button class="ui-btn" style="color:#FF5722" onmousedown="event.preventDefault(); applyColor('#FF5722')">橙色</button>
+                <button class="ui-btn" style="color:#2196F3" onmousedown="event.preventDefault(); applyColor('#2196F3')">蓝色</button>
+                <button class="ui-btn" style="color:#333" onmousedown="event.preventDefault(); applyColor('#333')">黑色</button>
+                <button class="ui-btn" style="color:#fff; background:#ccc;" onmousedown="event.preventDefault(); applyColor('#ffffff')">白色</button>
+                <div style="position:relative; width:40px; background:#eee; cursor:pointer; border-radius:8px; display:flex; align-items:center; justify-content:center;">
+                    🎨<input type="color" oninput="applyColor(this.value)" style="position:absolute; opacity:0; width:100%; height:100%; cursor:pointer;">
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="label-title">3. 福利布局</div>
+            <div class="ui-btn-group">
+                <button class="ui-btn" onclick="renderRows(2)" id="btn-layout-2">2个</button>
+                <button class="ui-btn active" onclick="renderRows(3)" id="btn-layout-3">3个</button>
+                <button class="ui-btn" onclick="renderRows(4)" id="btn-layout-4">4个</button>
+            </div>
+
+            <div style="margin-top:15px; padding:15px; background:#f0f2f5; border-radius:12px;">
+                <div class="label-title">插图/标题控制 <span id="sel-status" style="color:var(--ui-accent); font-weight:normal;">未选中</span></div>
+                
+                <div id="img-controls" style="display:none; flex-direction: column; gap:10px;">
+                    <div style="display:flex; gap:10px; align-items: center;">
+                        <span style="font-size:12px; color:#666; width:30px;">大小</span>
+                        <input type="range" class="ui-slider" id="img-scale-slider" min="0.5" max="3.5" step="0.1" value="1" oninput="scaleItem(this.value)">
+                    </div>
+                    <div id="flip-btn-wrapper" style="display:flex;">
+                         <button class="ui-btn" onclick="flipItem()" style="background:#fff; border:1px solid #ddd; flex:1;">⇄ 镜像翻转</button>
+                    </div>
+                </div>
+                <div style="font-size:12px; color:#999; margin-top:10px; line-height:1.5;">
+                    提示：选中后可拖拽移动，滚轮缩放。<br>头图标题也可点击选中缩放。
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="label-title">底部说明</div>
+            <input type="text" class="ui-input" value="以上所有活动限时为" oninput="document.getElementById('footer-text').innerText = this.value">
+        </div>
+
+        <button class="download-btn" onclick="downloadPoster()">
+             下载海报
+        </button>
+    </div>
+
+    <div class="preview-area" id="preview-area">
+        <div id="zoom-wrapper" style="transform: scale(0.4);">
+            <div id="poster">
+                <img src="logo.png" class="poster-logo" alt="Logo">
+
+                <div class="poster-header" id="poster-header" style="background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'1080\' height=\'700\'%3E%3Crect width=\'100%25\' height=\'100%25\' fill=\'%23e0e0e0\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'sans-serif\' font-size=\'48\' fill=\'%23999\'%3E点击左侧上传头图%3C/text%3E%3C/svg%3E');">
+                    
+                    <div class="header-text-container" id="header-text-container" 
+                         onclick="selectItem('header-text', 'header')"
+                         onmousedown="setupHeaderDragLogic(event)">
+                        <div class="header-subtitle" contenteditable="true">限时特惠活动</div>
+                        <div class="header-main-title" contenteditable="true">开学季大促</div>
+                    </div>
+
+                </div>
+                
+                <div class="content-card">
+                    <div class="title-container">
+                        <span class="main-title" contenteditable="true">活动福利</span>
+                    </div>
+                    <div class="benefit-list" id="benefit-list"></div>
+                </div>
+                <div class="poster-footer" id="footer-text">以上所有活动限时为</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 数据状态
+        let benefitState = [null, 
+            { t: '福利主标题一', d: '副标题占位符', img: '', s: {x:0, y:0, sc:1, f:1} },
+            { t: '福利主标题二', d: '副标题占位符', img: '', s: {x:0, y:0, sc:1, f:1} },
+            { t: '福利主标题三', d: '副标题占位符', img: '', s: {x:0, y:0, sc:1, f:1} },
+            { t: '福利主标题四', d: '副标题占位符', img: '', s: {x:0, y:0, sc:1, f:1} }
+        ];
+        // 🟢 头图标题状态：注意这里不再存储 x，或者 x 始终不产生效果
+        let headerTextState = { y: 0, sc: 1 };
+
+        let curSel = { type: null, id: null };
+
+        window.onload = () => {
+            setZoom(40);
+            renderRows(3);
+            setupHeaderDrag();
+            setupGlobalPaste();
+            setupClickOutside();
+            updateTheme('#4CAF50'); 
+        };
+
+        function setZoom(val) {
+            document.getElementById('zoom-slider').value = val;
+            document.getElementById('zoom-wrapper').style.transform = `scale(${val/100})`;
+            document.getElementById('zoom-text').innerText = val + '%';
+        }
+
+        // --- 点击海报外非操作区取消选择 ---
+        function setupClickOutside() {
+            document.getElementById('preview-area').addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('delete-btn')) return;
+                // 如果点的是输入框等不需要清除
+                if (e.target.id === 'preview-area' || e.target.id === 'zoom-wrapper') {
+                    clearSel();
+                }
+            });
+        }
+
+        // --- 头部 ---
+        function setHeaderHeight(val) {
+            document.getElementById('poster-header').style.height = val + 'px';
+            document.getElementById('header-h-text').innerText = val + 'px';
+        }
+        
+        function handleHeaderFile(file) {
+            if(file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('poster-header').style.backgroundImage = `url(${e.target.result})`;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        function setupHeaderDrag() {
+            const el = document.getElementById('header-drop-area');
+            el.addEventListener('dragover', e => { e.preventDefault(); el.style.borderColor = '#2196F3'; });
+            el.addEventListener('dragleave', () => el.style.borderColor = '#ddd');
+            el.addEventListener('drop', e => {
+                e.preventDefault(); el.style.borderColor = '#ddd';
+                handleHeaderFile(e.dataTransfer.files[0]);
+            });
+        }
+        function setupGlobalPaste() {
+            document.addEventListener('paste', e => {
+                const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                for (let index in items) {
+                    const item = items[index];
+                    if (item.kind === 'file' && item.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                            if(curSel.type === 'img' || curSel.type === 'zone') {
+                                const idx = parseInt(curSel.id.split('-')[1]);
+                                updateRowImage(idx, evt.target.result);
+                            } else {
+                                document.getElementById('poster-header').style.backgroundImage = `url(${evt.target.result})`;
+                            }
+                        };
+                        reader.readAsDataURL(item.getAsFile());
+                    }
+                }
+            });
+        }
+
+        // --- 颜色管理 ---
+        function updateTheme(hex, el) {
+            document.documentElement.style.setProperty('--main-color', hex);
+            
+            const mixedColor = mixWithWhite(hex, 0.3);
+            const gradient = `linear-gradient(135deg, ${hex} 0%, ${mixedColor} 100%)`;
+            document.documentElement.style.setProperty('--tag-gradient', gradient);
+
+            // 🟢 颜色调亮：只混合 10% 黑色 (原为 30%)
+            const darkColor = mixWithBlack(hex, 0.1); 
+            document.documentElement.style.setProperty('--stroke-color', darkColor);
+            
+            const subGradient = `linear-gradient(135deg, ${darkColor}, ${hex})`;
+            document.documentElement.style.setProperty('--subtitle-gradient', subGradient);
+
+            if(el) {
+                document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+                el.classList.add('active');
+            }
+        }
+
+        function mixWithWhite(hex, ratio) {
+            let c = parseHex(hex);
+            const r2 = Math.round(c.r * (1 - ratio) + 255 * ratio);
+            const g2 = Math.round(c.g * (1 - ratio) + 255 * ratio);
+            const b2 = Math.round(c.b * (1 - ratio) + 255 * ratio);
+            return `rgb(${r2}, ${g2}, ${b2})`;
+        }
+
+        function mixWithBlack(hex, ratio) {
+            let c = parseHex(hex);
+            const r2 = Math.round(c.r * (1 - ratio));
+            const g2 = Math.round(c.g * (1 - ratio));
+            const b2 = Math.round(c.b * (1 - ratio));
+            return `rgb(${r2}, ${g2}, ${b2})`;
+        }
+
+        function parseHex(hex) {
+            let c = hex.substring(1);
+            if(c.length === 3) c = c.split('').map(x=>x+x).join('');
+            return {
+                r: parseInt(c.substring(0,2), 16),
+                g: parseInt(c.substring(2,4), 16),
+                b: parseInt(c.substring(4,6), 16)
+            };
+        }
+
+        function applyColor(c) {
+            // 对选中的文字应用颜色 (contenteditable)
+            document.execCommand('styleWithCSS', false, true);
+            document.execCommand('foreColor', false, c);
+        }
+
+        // --- 🟢 头图标题拖拽逻辑 (仅Y轴) ---
+        let isHeaderDragging = false;
+
+        function setupHeaderDragLogic(e) {
+            if(e.target.isContentEditable && document.activeElement === e.target) return;
+            if(e.button !== 0) return;
+
+            isHeaderDragging = true;
+            selectItem('header-text', 'header'); 
+            e.stopPropagation(); 
+            
+            document.addEventListener('mousemove', onHeaderMove);
+            document.addEventListener('mouseup', onHeaderUp);
+        }
+
+        function onHeaderMove(e) {
+            if(!isHeaderDragging) return;
+            const globalZoom = document.getElementById('zoom-slider').value / 100;
+            // 🟢 锁定水平：不计算 movementX
+            const dy = e.movementY / globalZoom;
+
+            headerTextState.y += dy;
+            
+            applyHeaderTransform();
+        }
+
+        function onHeaderUp() {
+            isHeaderDragging = false;
+            document.removeEventListener('mousemove', onHeaderMove);
+            document.removeEventListener('mouseup', onHeaderUp);
+        }
+
+        function applyHeaderTransform() {
+            const el = document.getElementById('header-text-container');
+            // 🟢 translateX(-50%) 保持水平居中，只改变 Y
+            el.style.transform = `translateX(-50%) translateY(${headerTextState.y}px) scale(${headerTextState.sc})`;
+        }
+
+        // --- 渲染 ---
+        function renderRows(num) {
+            const list = document.getElementById('benefit-list');
+            list.innerHTML = '';
+            document.querySelectorAll('.ui-btn[id^="btn-layout"]').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-layout-${num}`).classList.add('active');
+            clearSel();
+
+            for(let i=1; i<=num; i++) {
+                const data = benefitState[i];
+                const row = document.createElement('div');
+                row.className = 'benefit-row';
+                row.id = `row-${i}`;
+                row.onclick = (e) => { 
+                    if(!e.target.isContentEditable && !e.target.classList.contains('delete-btn')) {
+                        selectItem('row', row.id); 
+                    }
+                };
+
+                row.innerHTML = `
+                    <div class="benefit-tag" contenteditable="true">福利${chineseNum(i)}</div>
+                    <div class="benefit-text">
+                        <div class="b-title" contenteditable="true" oninput="saveText(${i}, 't', this.innerText)">${data.t}</div>
+                        <div class="b-desc" contenteditable="true" oninput="saveText(${i}, 'd', this.innerText)">${data.d}</div>
+                    </div>
+                    
+                    <div class="benefit-upload-zone ${data.img ? 'has-image' : ''}" id="zone-${i}" 
+                         onclick="if(!this.classList.contains('has-image')) { document.getElementById('upload-${i}').click(); } event.stopPropagation(); selectItem('zone', this.id)">
+                        <div class="delete-btn" onclick="deleteImage(${i}); event.stopPropagation()">×</div>
+                        <div class="zone-placeholder">+</div>
+                        <input type="file" id="upload-${i}" hidden accept="image/*" onchange="handleRowFile(this, ${i})">
+                        <img class="benefit-img" id="img-${i}" src="${data.img}" draggable="false"
+                             style="display:${data.img ? 'block' : 'none'};"
+                             onmousedown="setupDraggable(event, ${i})"
+                             onclick="event.stopPropagation(); selectItem('img', this.id)">
+                    </div>
+                `;
+                
+                setupZoneDrag(row.querySelector('.benefit-upload-zone'), i);
+                list.appendChild(row);
+                
+                // 插图滚轮缩放
+                const img = document.getElementById(`img-${i}`);
+                if(img) {
+                    img.addEventListener('wheel', (e) => {
+                        e.preventDefault();
+                        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                        let newScale = benefitState[i].s.sc + delta;
+                        if(newScale < 0.2) newScale = 0.2;
+                        if(newScale > 5.0) newScale = 5.0;
+                        benefitState[i].s.sc = newScale;
+                        applyTransform(img, benefitState[i].s);
+                        updateRowAutoHeight(i);
+                        if(curSel.id === img.id) {
+                            document.getElementById('img-scale-slider').value = newScale;
+                        }
+                    }, { passive: false });
+                }
+
+                if(data.img) {
+                    applyTransform(img, data.s);
+                    setTimeout(() => updateRowAutoHeight(i), 50);
+                }
+            }
+        }
+
+        function saveText(idx, key, val) { benefitState[idx][key] = val; }
+        
+        function updateRowImage(idx, src) {
+            benefitState[idx].img = src;
+            const img = document.getElementById(`img-${idx}`);
+            const zone = document.getElementById(`zone-${idx}`);
+            img.src = src; img.style.display = 'block';
+            zone.classList.add('has-image');
+            selectItem('img', img.id);
+            img.onload = () => updateRowAutoHeight(idx);
+        }
+
+        function deleteImage(idx) {
+            benefitState[idx].img = '';
+            benefitState[idx].s = {x:0, y:0, sc:1, f:1};
+            
+            const img = document.getElementById(`img-${idx}`);
+            const zone = document.getElementById(`zone-${idx}`);
+            
+            img.src = ''; 
+            img.style.display = 'none';
+            applyTransform(img, benefitState[idx].s);
+            
+            zone.classList.remove('has-image');
+            zone.classList.remove('selected'); 
+            
+            if(curSel.id === `img-${idx}` || curSel.id === `zone-${idx}`) {
+                clearSel();
+            }
+            updateRowAutoHeight(idx);
+        }
+
+        function handleRowFile(input, idx) {
+            if(input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => updateRowImage(idx, e.target.result);
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        function setupZoneDrag(zone, idx) {
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = '#2196F3'; });
+            zone.addEventListener('dragleave', () => { 
+                if(!benefitState[idx].img) zone.style.borderColor = '#d0d7de'; 
+                else zone.style.borderColor = 'transparent';
+            });
+            zone.addEventListener('drop', e => {
+                e.preventDefault(); 
+                const file = e.dataTransfer.files[0];
+                if(file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => updateRowImage(idx, evt.target.result);
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+        function chineseNum(n) { return ['零','一','二','三','四'][n] || n; }
+
+        // --- 核心交互：图片拖拽 ---
+        let isDragging = false;
+        let dragIdx = null;
+
+        function setupDraggable(e, idx) {
+            if(e.button !== 0) return; 
+            isDragging = true;
+            dragIdx = idx;
+            e.preventDefault();
+            
+            selectItem('img', `img-${idx}`);
+            document.addEventListener('mousemove', onGlobalMove);
+            document.addEventListener('mouseup', onGlobalUp);
+        }
+
+        function onGlobalMove(e) {
+            if(!isDragging) return;
+            const globalZoom = document.getElementById('zoom-slider').value / 100;
+            const dx = e.movementX / globalZoom;
+            const dy = e.movementY / globalZoom;
+            const s = benefitState[dragIdx].s;
+            s.x += dx;
+            s.y += dy;
+            const img = document.getElementById(`img-${dragIdx}`);
+            applyTransform(img, s);
+            updateRowAutoHeight(dragIdx);
+        }
+
+        function onGlobalUp() {
+            isDragging = false;
+            dragIdx = null;
+            document.removeEventListener('mousemove', onGlobalMove);
+            document.removeEventListener('mouseup', onGlobalUp);
+        }
+
+        // --- 选择与控制 ---
+        function selectItem(type, id) {
+            // Zone 自动转 Img
+            if(type === 'zone') {
+                const idx = parseInt(id.split('-')[1]);
+                if(benefitState[idx].img) {
+                    type = 'img';
+                    id = `img-${idx}`;
+                }
+            }
+
+            // 清除旧状态
+            document.querySelectorAll('.benefit-row, .benefit-img, .benefit-upload-zone, .header-text-container').forEach(e => e.classList.remove('selected'));
+            
+            curSel = { type, id };
+            const el = document.getElementById(id === 'header' ? 'header-text-container' : id);
+            
+            if(el) el.classList.add('selected');
+
+            const controls = document.getElementById('img-controls');
+            const slider = document.getElementById('img-scale-slider');
+            const flipBtn = document.getElementById('flip-btn-wrapper');
+
+            if(type === 'row') {
+                document.getElementById('sel-status').innerText = "福利行";
+                controls.style.display = 'none';
+            } else if(type === 'img') {
+                const idx = parseInt(id.split('-')[1]);
+                document.getElementById(`zone-${idx}`).classList.add('selected'); 
+                
+                document.getElementById('sel-status').innerText = "插图";
+                controls.style.display = 'flex';
+                flipBtn.style.display = 'flex'; 
+                slider.value = benefitState[idx].s.sc;
+            } else if(type === 'header-text') {
+                document.getElementById('sel-status').innerText = "头图标题";
+                controls.style.display = 'flex';
+                flipBtn.style.display = 'none'; 
+                slider.value = headerTextState.sc;
+            }
+        }
+
+        function clearSel() {
+            document.querySelectorAll('.benefit-row, .benefit-img, .benefit-upload-zone, .header-text-container').forEach(e => e.classList.remove('selected'));
+            document.getElementById('sel-status').innerText = "未选中";
+            document.getElementById('img-controls').style.display = 'none';
+            curSel = { type: null, id: null };
+        }
+        
+        function scaleItem(val) {
+            if(curSel.type === 'img') {
+                const idx = parseInt(curSel.id.split('-')[1]);
+                benefitState[idx].s.sc = parseFloat(val);
+                applyTransform(document.getElementById(curSel.id), benefitState[idx].s);
+                updateRowAutoHeight(idx);
+            } else if (curSel.type === 'header-text') {
+                headerTextState.sc = parseFloat(val);
+                applyHeaderTransform();
+            }
+        }
+        
+        function flipItem() {
+            if(curSel.type !== 'img') return;
+            const idx = parseInt(curSel.id.split('-')[1]);
+            benefitState[idx].s.f *= -1;
+            applyTransform(document.getElementById(curSel.id), benefitState[idx].s);
+        }
+        
+        function applyTransform(el, s) {
+            el.style.transform = `translate(${s.x}px, ${s.y}px) scale(${s.sc}) scaleX(${s.f})`;
+        }
+
+        function updateRowAutoHeight(idx) {
+            const row = document.getElementById(`row-${idx}`);
+            const img = document.getElementById(`img-${idx}`);
+            if(!row || !img || img.style.display === 'none') return;
+
+            row.style.minHeight = ''; 
+            const currentContentHeight = row.offsetHeight; 
+            const rowRect = row.getBoundingClientRect();
+            const imgRect = img.getBoundingClientRect();
+            const imgBottomRel = imgRect.bottom - rowRect.top;
+            
+            if (imgBottomRel + 40 > currentContentHeight) { 
+                row.style.minHeight = (imgBottomRel + 40) + 'px';
+            }
+        }
+
+        // --- 下载 ---
+        function downloadPoster() {
+            clearSel(); 
+            
+            const poster = document.getElementById('poster');
+            const btn = document.querySelector('.download-btn');
+            const oldText = btn.innerHTML;
+            btn.innerHTML = "⏳ 生成中...";
+            btn.disabled = true;
+
+            window.scrollTo(0,0);
+
+            html2canvas(poster, {
+                scale: 2, 
+                useCORS: true, 
+                allowTaint: false, 
+                backgroundColor: null,
+                onclone: (clonedDoc) => {
+                    const selectedEls = clonedDoc.querySelectorAll('.selected');
+                    selectedEls.forEach(el => el.classList.remove('selected'));
+                    const wrapper = clonedDoc.getElementById('zoom-wrapper');
+                    if(wrapper) wrapper.style.transform = 'none';
+                }
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = '活动海报_高清.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                
+                btn.innerHTML = oldText;
+                btn.disabled = false;
+            }).catch(err => {
+                alert("下载出错：" + err);
+                console.error(err);
+                btn.innerHTML = oldText;
+                btn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>
